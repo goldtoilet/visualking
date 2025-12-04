@@ -105,8 +105,8 @@ def load_config():
     # 새 7개 지침
     if isinstance(data.get("inst_role"), str):
         st.session_state.inst_role = data["inst_role"]
-    # 이전 role_instruction 키가 있으면 fallback
     elif isinstance(data.get("role_instruction"), str):
+        # 예전 키 호환
         st.session_state.inst_role = data["role_instruction"]
 
     for key in [
@@ -233,7 +233,7 @@ def run_generation():
     if not topic:
         return
 
-    # 최근 검색어 관리
+    # 최근 검색어 관리 (중복 제거 + 마지막 5개 유지)
     hist = st.session_state.history
     if topic in hist:
         hist.remove(topic)
@@ -271,7 +271,7 @@ def run_generation():
 
 
 # -------------------------
-# 사이드바: 모델 + 7개 지침 + 최근 검색어 + 계정 관리
+# 사이드바: 모델 + 7개 지침 + 계정 관리
 # -------------------------
 with st.sidebar:
     st.markdown("### ⚙️ 설정")
@@ -424,18 +424,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # 최근 검색어
-    st.markdown("### 🕒 최근 검색어")
-    if not st.session_state.history:
-        st.caption("최근 검색어가 없습니다.")
-    else:
-        for i, item in enumerate(reversed(st.session_state.history[-5:])):
-            if st.button(item, key=f"recent_{i}"):
-                st.session_state.current_input = item
-                run_generation()
-
-    st.markdown("---")
-
     # 계정 관리 (비밀번호 변경 + 로그아웃)
     with st.expander("👤 계정 관리", expanded=False):
         st.caption("비밀번호 변경 및 로그아웃")
@@ -482,14 +470,66 @@ st.markdown(
         box-shadow: 0 3px 8px rgba(0,0,0,0.06);
     '>N</div>
     <h1 style='margin-top:20px; margin-bottom:6px;'>대본 마스터</h1>
-    <p style='color:#6b7280; font-size:0.9rem; margin-bottom:40px;'>
+    <p style='color:#6b7280; font-size:0.9rem; margin-bottom:10px;'>
         한 줄 주제만 입력하면 감성적인 다큐멘터리 내레이션을 생성합니다.
     </p>
 </div>
-<div style='height:40px;'></div>
 """,
     unsafe_allow_html=True,
 )
+
+# -------------------------
+# (NEW) 최근 검색어 - 본문에 작게, 세로 리스트
+# -------------------------
+if st.session_state.history:
+    items = st.session_state.history[-5:]  # 오래된 것 위, 최신이 아래
+    html_items = ""
+    for h in items:
+        html_items += f"""
+        <div style="
+            display:block;
+            margin:2px auto 4px auto;
+            padding:3px 12px;
+            max-width:260px;
+            font-size:0.78rem;
+            color:#374151;
+            background:#f3f4f6;
+            border-radius:999px;
+            text-align:left;
+        ">
+            - {h}
+        </div>
+        """
+    st.markdown(
+        f"""
+        <div style="
+            text-align:center;
+            margin-top:10px;
+            margin-bottom:16px;
+        ">
+            <div style="font-size:0.75rem; color:#6b7280; margin-bottom:4px;">
+                최근 검색어
+            </div>
+            {html_items}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        """
+        <div style="
+            text-align:center;
+            margin-top:10px;
+            margin-bottom:16px;
+            font-size:0.7rem;
+            color:#9ca3af;
+        ">
+            최근 검색어 없음
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # -------------------------
 # 주제 입력 + 버튼
