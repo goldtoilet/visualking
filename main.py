@@ -4,7 +4,7 @@ import os
 import json
 from json import JSONDecodeError
 
-st.set_page_config(page_title="대본 마스터", page_icon="📝", layout="centered")
+st.set_page_config(page_title="시각화 마스터", page_icon="📝", layout="centered")
 
 LOGIN_ID_ENV = os.getenv("LOGIN_ID")
 LOGIN_PW_ENV = os.getenv("LOGIN_PW")
@@ -31,33 +31,120 @@ st.session_state.setdefault("login_id", LOGIN_ID_ENV or "")
 st.session_state.setdefault("login_pw", LOGIN_PW_ENV or "")
 st.session_state.setdefault("remember_login", False)
 
+# ===== 기본 지침 값 세팅 =====
 st.session_state.setdefault(
     "inst_role",
-    "너는 감성적이고 스토리텔링이 뛰어난 다큐멘터리 내레이터다."
+    """너의 역할은 **한국어 대본을 이미지 시각화용 영어 프롬프트로 변환하는 전문 변환기(visualization prompt generator)**다.
+항상 원문 의미를 정확히 해석하고, 의미 범위를 벗어나지 않는 사실적·현실적 묘사만 허용한다.
+출력은 “스크립트-투-이미지” 목적에 최적화된 형태로 구성한다."""
 )
+
 st.session_state.setdefault(
     "inst_tone",
-    "톤은 진지하고 서정적이며, 첫 문장은 강렬한 훅으로 시작한다."
+    """[2. 톤·스타일 지침 (Tone & Style Instructions)]
+
+전체적인 어조는 명확·중립·사실적이다.
+
+묘사는 감정·장면·구도 등을 구체적으로 표현하되, 과도한 창작이나 판타지는 금지한다.
+
+시각 묘사는 장르적 성격(다큐 / 시네마틱 / 애니메이션 / 전기 등)에 일관되도록 유지한다.
+
+[2-A. 스타일 래퍼 지침 (Style Wrapper Rules)]
+
+아래 규칙은 이미지 프롬프트 앞에 항상 붙는 공통 스타일 문장에 관한 규칙이다.
+
+- 대본 분석을 기반으로 단일 장르를 선택한다. (예: documentary, cinematic, animation 등)
+- 선택된 장르에 맞춰 스타일 래퍼 1문장만 선언한다.
+- 생성되는 모든 영어 이미지 프롬프트 문장의 가장 앞에 이 스타일 래퍼 문장을 완전히 동일하게 반복한다.
+- 단 하나의 단어·쉼표도 변형·삭제 금지, 누락 금지."""
 )
+
+# 공통 스타일 래퍼(실제 한 문장)를 별도로 저장하는 필드
+st.session_state.setdefault(
+    "inst_style_wrapper",
+    "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, neutral color grading, close-up or wide shot, cinematic realism, subtle noise/grain added."
+)
+
 st.session_state.setdefault(
     "inst_structure",
-    "인트로 → 배경 → 사건/전개 → 여운이 남는 결론 순서로 전개한다."
+    """[3. 구성 지침 (Structure / Flow)]
+
+스크립트-투-이미지 변환 출력은 다음 순서를 반드시 따른다:
+
+1) 제목
+   - 항상 이 텍스트로 시작한다:
+     ⚡ 스크립트-투-이미지 시각화 프롬프트
+
+2) 대본 분석 요약 (2~4문장)
+   - 주제 · 톤 · 정서 · 장르적 특성 포함
+   - 이를 기반으로 최종 장르 선택
+
+3) 스타일 래퍼 선언
+   - 선택된 장르에 맞춘 1문장을 ‘스타일 래퍼:’ 아래 제시
+
+4) 문장별 변환
+   - 원문 대본을 자연스러운 의미 단위로 나누고
+   - 각 문장은 반드시 2줄 구조로 출력:
+     [한국어 원문]
+     [영어 이미지 프롬프트]"""
 )
+
 st.session_state.setdefault(
     "inst_depth",
-    "사실 기반 정보를 충분히 포함하되, 사건의 핵심 원인과 결과를 반드시 드러낸다."
+    """[4. 정보 밀도·연구 깊이 지침 (Depth Rules)]
+
+- 원문 의미를 벗어나지 않는 범위 내에서 최대한 구체적이고 사실적인 시각 요소를 추가한다.
+- 묘사는 장면·환경·빛·감정·구도·움직임 등을 자연스러운 선에서 확장한다.
+- 실존 요소(장소, 시대적 분위기 등)는 왜곡 없이 표현한다.
+- 지나친 해석, 상상, 상징적 장면 창조는 금지한다."""
 )
+
 st.session_state.setdefault(
     "inst_forbidden",
-    "선정적 표현, 과도한 비유, 독자에게 말을 거는 질문형 표현은 사용하지 않는다."
+    """[5. 금지 지침 (Forbidden Rules)]
+
+다음 사항은 절대 금지한다:
+
+- 스타일 래퍼 누락
+- 스타일 래퍼의 단어·구문 수정 또는 축약
+- 대본 분석 없이 바로 이미지 프롬프트 생성
+- 원문 의미 과장·왜곡
+- 판타지/허구적 창작, 초현실적 요소 추가
+- 실존 인물·단체의 왜곡
+- 문장 앞뒤 형식 변경
+- 문장의 두 줄 구조(한국어 → 영어 프롬프트) 무시
+- 출력 순서 임의 변경"""
 )
+
 st.session_state.setdefault(
     "inst_format",
-    "전체 분량은 500자 이상으로 하고, 소제목 없이 자연스러운 내레이션만 생성하며, 문단 사이에는 한 줄 공백을 둔다."
+    """[6. 출력 형식 지침 (Format Rules)]
+
+최종 출력 형식은 다음을 반드시 따른다:
+
+1) 제목
+   - ⚡ 스크립트-투-이미지 시각화 프롬프트
+
+2) 대본 분석 요약(2~4문장)
+
+3) 스타일 래퍼 선언부
+
+4) 문장별 변환
+   - 한국어 문장
+   - 공통 스타일 래퍼로 시작하는 영어 이미지 프롬프트
+     (두 줄 세트 반복)
+
+전체 출력은 깔끔하고 구분된 블록 형태로 유지해야 한다."""
 )
+
 st.session_state.setdefault(
     "inst_user_intent",
-    "사용자가 입력한 주제를 내러티브의 중심축으로 삼고, 배경 정보를 자연스럽게 녹여 스토리화한다."
+    """[7. 사용자 요청 반영 지침 (User Intent Adaptation)]
+
+- 사용자의 요청(장르 지정, 스타일 기조, 시각화 정도 등)을 항상 최우선으로 반영한다.
+- 사용자가 특정 스타일을 요구할 경우, 선택된 장르와 충돌하지 않는 선에서 조정한다.
+- 대본의 특성상 의미 단위가 길거나 짧아도, 자연스러운 문장 단위로 분리해 처리한다.
+- 변환 결과는 즉시 사용 가능한 이미지 생성용 프롬프트로 제공해야 한다."""
 )
 
 st.session_state.setdefault("current_input", "")
@@ -86,6 +173,7 @@ def load_config():
         "inst_forbidden",
         "inst_format",
         "inst_user_intent",
+        "inst_style_wrapper",
     ]:
         if isinstance(data.get(key), str):
             setattr(st.session_state, key, data[key])
@@ -111,6 +199,7 @@ def save_config():
         "inst_forbidden": st.session_state.inst_forbidden,
         "inst_format": st.session_state.inst_format,
         "inst_user_intent": st.session_state.inst_user_intent,
+        "inst_style_wrapper": st.session_state.inst_style_wrapper,
         "history": st.session_state.history[-5:],
         "login_id": st.session_state.login_id,
         "login_pw": st.session_state.login_pw,
@@ -146,7 +235,7 @@ def login_screen():
             color:#111827; font-weight:bold;
             box-shadow: 0 3px 8px rgba(0,0,0,0.08);
         '>N</div>
-        <h1 style='margin-top:26px; margin-bottom:24px;'>대본 마스터</h1>
+        <h1 style='margin-top:26px; margin-bottom:24px;'>시각화 마스터</h1>
     </div>""",
         unsafe_allow_html=True,
     )
@@ -243,21 +332,27 @@ def run_generation():
         st.session_state.inst_forbidden,
         st.session_state.inst_format,
         st.session_state.inst_user_intent,
+        f"[공통 스타일 래퍼]\n{st.session_state.inst_style_wrapper}",
     ]
     system_text = "\n\n".join(
         part.strip() for part in system_parts if isinstance(part, str) and part.strip()
     )
 
-    user_text = f"다음 주제에 맞는 다큐멘터리 내레이션을 작성해줘.\n\n주제: {topic}"
+    user_text = (
+        "위 1~7 지침을 모두 엄격하게 따르면서, 아래 한국어 대본을 "
+        "스크립트-투-이미지 시각화용 출력 형식으로 변환해줘.\n\n"
+        "대본:\n"
+        f"{topic}"
+    )
 
-    with st.spinner("🎬 대본을 작성하는 중입니다..."):
+    with st.spinner("🎬 대본을 시각화용 프롬프트로 변환하는 중입니다..."):
         res = client.chat.completions.create(
             model=st.session_state.model_choice,
             messages=[
                 {"role": "system", "content": system_text},
                 {"role": "user", "content": user_text},
             ],
-            max_tokens=600,
+            max_tokens=800,
         )
 
     st.session_state.last_output = res.choices[0].message.content
@@ -270,16 +365,11 @@ with st.sidebar:
     st.markdown("### 📘 지침")
 
     with st.expander("1. 역할 지침 (Role Instructions)", expanded=False):
-        st.caption("ChatGPT가 어떤 캐릭터 / 전문가 / 화자인지 정의합니다.")
-        st.markdown(
-            "- 예: `당신은 다큐멘터리 전문 내레이터이다.`\n"
-            "- 예: `당신은 사건의 흐름을 촘촘히 짜주는 스토리텔링 편집자다.`\n"
-            "- 예: `당신은 유튜브 쇼츠용 대본을 압축해주는 전문가다.`"
-        )
+        st.caption("한국어 대본을 이미지 시각화용 영어 프롬프트로 변환하는 역할을 정의합니다.")
         inst_role_edit = st.text_area(
             "역할 지침",
             st.session_state.inst_role,
-            height=125,
+            height=160,
             key="inst_role_edit",
         )
         if st.button("역할 지침 저장", key="save_role"):
@@ -288,36 +378,38 @@ with st.sidebar:
                 save_config()
             st.success("역할 지침이 저장되었습니다.")
 
-    with st.expander("2. 톤 & 스타일 지침", expanded=False):
-        st.caption("어떤 분위기/문체/리듬으로 말할지 정의합니다.")
-        st.markdown(
-            "- 예: `톤은 진지하고 저널리즘 스타일을 유지한다.`\n"
-            "- 예: `첫 문장은 100% 강렬한 훅으로 시작한다.`\n"
-            "- 예: `문장은 짧고 간결하며 리듬감 있게 구성한다.`"
-        )
+    with st.expander("2. 톤 & 스타일 지침 + 공통 스타일 래퍼", expanded=False):
+        st.caption("전체적인 톤/스타일 규칙과, 모든 이미지 프롬프트 앞에 붙일 공통 스타일 래퍼를 정의합니다.")
+
         inst_tone_edit = st.text_area(
             "톤 & 스타일 지침",
             st.session_state.inst_tone,
-            height=125,
+            height=220,
             key="inst_tone_edit",
         )
-        if st.button("톤 & 스타일 지침 저장", key="save_tone"):
+
+        inst_style_wrapper_edit = st.text_area(
+            "공통 스타일 래퍼 (영어 한 문장)",
+            st.session_state.inst_style_wrapper,
+            height=80,
+            key="inst_style_wrapper_edit",
+            placeholder="Shot on high-resolution digital cinema camera, 16:9 aspect ratio, neutral color grading, close-up or wide shot, cinematic realism, subtle noise/grain added.",
+        )
+
+        if st.button("톤 & 스타일 / 스타일 래퍼 지침 저장", key="save_tone"):
             if inst_tone_edit.strip():
                 st.session_state.inst_tone = inst_tone_edit.strip()
-                save_config()
-            st.success("톤 & 스타일 지침이 저장되었습니다.")
+            if inst_style_wrapper_edit.strip():
+                st.session_state.inst_style_wrapper = inst_style_wrapper_edit.strip()
+            save_config()
+            st.success("톤 & 스타일 / 공통 스타일 래퍼가 저장되었습니다.")
 
     with st.expander("3. 콘텐츠 구성 지침", expanded=False):
-        st.caption("초반–중반–후반 또는 장면 흐름을 어떻게 짤지 정의합니다.")
-        st.markdown(
-            "- 예: `인트로 → 배경 → 사건 → 인물 → 결론 단계로 전개하라.`\n"
-            "- 예: `각 문단은 3~4문장으로 제한한다.`\n"
-            "- 예: `스토리 전개는 시간순으로 배열한다.`"
-        )
+        st.caption("스크립트-투-이미지 출력의 전체 흐름 구조를 정의합니다.")
         inst_structure_edit = st.text_area(
             "콘텐츠 구성 지침",
             st.session_state.inst_structure,
-            height=125,
+            height=200,
             key="inst_structure_edit",
         )
         if st.button("콘텐츠 구성 지침 저장", key="save_structure"):
@@ -327,16 +419,11 @@ with st.sidebar:
             st.success("콘텐츠 구성 지침이 저장되었습니다.")
 
     with st.expander("4. 정보 밀도 & 조사 심도 지침", expanded=False):
-        st.caption("얼마나 깊게, 얼마나 촘촘하게 설명할지 정의합니다.")
-        st.markdown(
-            "- 예: `사실 기반의 정보 비율을 50% 이상 유지.`\n"
-            "- 예: `불필요한 수식어는 최소화.`\n"
-            "- 예: `사건의 핵심 원인·결과를 반드시 포함.`"
-        )
+        st.caption("얼마나 구체적이고 깊게 시각 정보를 확장할지 정의합니다.")
         inst_depth_edit = st.text_area(
             "정보 밀도 & 조사 심도 지침",
             st.session_state.inst_depth,
-            height=125,
+            height=200,
             key="inst_depth_edit",
         )
         if st.button("정보 밀도 지침 저장", key="save_depth"):
@@ -346,16 +433,11 @@ with st.sidebar:
             st.success("정보 밀도 지침이 저장되었습니다.")
 
     with st.expander("5. 금지 지침 (Forbidden Rules)", expanded=False):
-        st.caption("절대 쓰지 말아야 할 표현/스타일/토픽을 정의합니다.")
-        st.markdown(
-            "- 예: `예시나 비유를 남발하지 마라.`\n"
-            "- 예: `독자에게 질문 형태로 말 걸지 말라.`\n"
-            "- 예: `선정적 표현은 제외.`"
-        )
+        st.caption("절대 허용하지 않을 변형/스타일/출력 형식을 정의합니다.")
         inst_forbidden_edit = st.text_area(
             "금지 지침",
             st.session_state.inst_forbidden,
-            height=125,
+            height=220,
             key="inst_forbidden_edit",
         )
         if st.button("금지 지침 저장", key="save_forbidden"):
@@ -364,17 +446,12 @@ with st.sidebar:
                 save_config()
             st.success("금지 지침이 저장되었습니다.")
 
-    with st.expander("6. 출력 형식 지침 (Output Format)", expanded=False):
-        st.caption("길이, 단락, 제목, 마크다운 형식 등을 정의합니다.")
-        st.markdown(
-            "- 예: `전체 500자 이상.`\n"
-            "- 예: `소제목 없이 자연스러운 내레이션만 생성.`\n"
-            "- 예: `문단 간 공백 1줄 유지.`"
-        )
+    with st.expander("6. 출력 형식 지침 (Format Rules)", expanded=False):
+        st.caption("최종 출력의 제목, 블록 구조, 줄 배치 등을 정의합니다.")
         inst_format_edit = st.text_area(
             "출력 형식 지침",
             st.session_state.inst_format,
-            height=125,
+            height=220,
             key="inst_format_edit",
         )
         if st.button("출력 형식 지침 저장", key="save_format"):
@@ -384,15 +461,11 @@ with st.sidebar:
             st.success("출력 형식 지침이 저장되었습니다.")
 
     with st.expander("7. 사용자 요청 반영 지침", expanded=False):
-        st.caption("사용자가 준 주제/키워드를 어떻게 스토리 안에 녹일지 정의합니다.")
-        st.markdown(
-            "- 예: `사용자가 입력한 키워드를 내러티브 중심축으로 사용한다.`\n"
-            "- 예: `주제의 배경 정보를 먼저 파악한 뒤 스토리화한다.`"
-        )
+        st.caption("사용자 요구(장르/스타일/시각화 정도 등)를 어떻게 반영할지 정의합니다.")
         inst_user_intent_edit = st.text_area(
             "사용자 요청 반영 지침",
             st.session_state.inst_user_intent,
-            height=125,
+            height=200,
             key="inst_user_intent_edit",
         )
         if st.button("사용자 요청 지침 저장", key="save_user_intent"):
@@ -458,12 +531,12 @@ st.markdown(
         color:#111827; font-weight:bold;
         box-shadow: 0 3px 8px rgba(0,0,0,0.08);
     '>N</div>
-    <h1 style='margin-top:26px; margin-bottom:6px;'>대본 마스터</h1>
+    <h1 style='margin-top:26px; margin-bottom:6px;'>시각화 마스터</h1>
 </div>""",
     unsafe_allow_html=True,
 )
 
-# -------- div2: 최근 검색어 --------
+# -------- div2: 최근 입력 --------
 if st.session_state.history:
     items = st.session_state.history[-5:]
 
@@ -504,19 +577,19 @@ else:
         unsafe_allow_html=True,
     )
 
-# -------- div3: 입력 영역 (가운데 정렬, 버튼 제거) --------
+# -------- div3: 입력 영역 (가운데 정렬, 버튼 없이 on_change) --------
 pad_left, center_col, pad_right = st.columns([1, 7, 1])
 
 with center_col:
     st.markdown(
-        "<div style='color:#BDC6D2; font-size:0.9rem; margin-bottom:10px; text-align:center;'>한 문장 또는 짧은 키워드로 주제를 적어주세요.</div>",
+        "<div style='color:#BDC6D2; font-size:0.9rem; margin-bottom:10px; text-align:center;'>대본을 붙여넣어주세요,자동으로 시각화해드립니다</div>",
         unsafe_allow_html=True,
     )
 
     st.text_input(
         label="주제 입력",
         key="current_input",
-        placeholder="gpt에게 물어보기",
+        placeholder="gpt에게 시각화 부탁하기",
         label_visibility="collapsed",
         on_change=run_generation,
     )
@@ -525,5 +598,5 @@ st.markdown("<div style='height:32px;'></div>", unsafe_allow_html=True)
 
 # -------- 결과 --------
 if st.session_state.last_output:
-    st.subheader("📄 생성된 내레이션")
+    st.subheader("📄 생성된 스크립트-투-이미지 프롬프트")
     st.write(st.session_state.last_output)
