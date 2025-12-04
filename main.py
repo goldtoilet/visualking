@@ -233,7 +233,7 @@ def run_generation():
     if not topic:
         return
 
-    # 최근 검색어 관리 (중복 제거 + 마지막 5개 유지)
+    # 최근 검색어 관리 (중복 제거 + 마지막 5개 유지, 오래된 것 위, 최신 아래)
     hist = st.session_state.history
     if topic in hist:
         hist.remove(topic)
@@ -479,10 +479,11 @@ st.markdown(
 )
 
 # -------------------------
-# (NEW) 최근 검색어 - 본문에 작게, 세로 리스트
+# 최근 검색어 (본문에 작게, 세로 리스트 + 라운드)
 # -------------------------
 if st.session_state.history:
-    items = st.session_state.history[-5:]  # 오래된 것 위, 최신이 아래
+    # 오래된 것 위, 최신이 아래
+    items = st.session_state.history[-5:]
     html_items = ""
     for h in items:
         html_items += f"""
