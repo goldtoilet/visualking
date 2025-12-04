@@ -1,3 +1,6 @@
+import os
+st.write("현재 작업 디렉토리:", os.getcwd())
+
 import streamlit as st
 from openai import OpenAI
 import os
