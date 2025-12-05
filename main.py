@@ -1,13 +1,8 @@
-
 import streamlit as st
 from openai import OpenAI
 import os
 import json
 from json import JSONDecodeError
-st.write("현재 작업 디렉토리:", os.getcwd())
-st.write("현재 디렉토리 파일 목록:", os.listdir(os.getcwd()))
-
-st.write("config.json 존재 여부:", os.path.exists("config.json"))
 
 st.set_page_config(page_title="시각화 마스터", page_icon="📝", layout="centered")
 
@@ -212,6 +207,41 @@ def save_config():
     }
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# === config.json 및 세션 초기화 함수 ===
+def reset_config():
+    # 파일 삭제
+    if os.path.exists(CONFIG_PATH):
+        os.remove(CONFIG_PATH)
+
+    # 세션 값 초기화 (지침/로그인/최근 기록)
+    for key in [
+        "inst_role",
+        "inst_tone",
+        "inst_structure",
+        "inst_depth",
+        "inst_forbidden",
+        "inst_format",
+        "inst_user_intent",
+        "inst_style_wrapper",
+        "history",
+        "login_id",
+        "login_pw",
+        "remember_login",
+        "current_input",
+        "last_output",
+    ]:
+        if key in st.session_state:
+            del st.session_state[key]
+
+    # 로그인 상태 및 config_loaded 플래그 초기화
+    st.session_state["logged_in"] = False
+    if "config_loaded" in st.session_state:
+        del st.session_state["config_loaded"]
+
+    # 다시 실행 (기본 setdefault 지침들로 재세팅됨)
+    st.rerun()
 
 
 def login_screen():
@@ -521,6 +551,12 @@ with st.sidebar:
             st.session_state.current_input = ""
             st.session_state.last_output = ""
             st.rerun()
+
+    # === config.json 초기화 섹션 ===
+    with st.expander("🧹 설정 초기화 (config.json)", expanded=False):
+        st.caption("모든 지침, 최근 입력, 로그인 정보, config.json 파일을 초기화합니다. 되돌릴 수 없습니다.")
+        if st.button("config.json 초기화", use_container_width=True):
+            reset_config()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
