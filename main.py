@@ -1096,13 +1096,13 @@ with center_col:
         unsafe_allow_html=True,
     )
 
-    st.text_input(
-        label="주제 입력",
-        key="current_input",
-        placeholder="gpt에게 물어보기",
-        label_visibility="collapsed",
-        on_change=run_generation,
-    )
+    st.text_area(
+    label="주제 입력",
+    key="current_input",
+    placeholder="gpt에게 물어보기",
+    height=180,
+    label_visibility="collapsed",
+)
 
 st.markdown("<div style='height:32px;'></div>", unsafe_allow_html=True)
 
