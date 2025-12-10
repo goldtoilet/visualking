@@ -59,13 +59,24 @@ st.session_state.setdefault("current_input", "")
 st.session_state.setdefault("last_output", "")
 st.session_state.setdefault("model_choice", "gpt-4o-mini")
 
+# ===== 텍스트 지침 set 관련 상태 =====
 st.session_state.setdefault("instruction_sets", [])
 st.session_state.setdefault("active_instruction_set_id", None)
 st.session_state.setdefault("show_instruction_set_editor", False)
 st.session_state.setdefault("edit_instruction_set_id", None)
-
 st.session_state.setdefault("instset_toolbar_run_id", 0)
 st.session_state.setdefault("instset_delete_mode", False)
+
+# ===== 이미지 지침 set 관련 상태 =====
+st.session_state.setdefault("image_instruction_sets", [])
+st.session_state.setdefault("active_image_instruction_set_id", None)
+st.session_state.setdefault("show_image_instruction_set_editor", False)
+st.session_state.setdefault("edit_image_instruction_set_id", None)
+st.session_state.setdefault("image_instset_toolbar_run_id", 0)
+st.session_state.setdefault("image_instset_delete_mode", False)
+st.session_state.setdefault("common_image_instruction", "")
+
+# ===== 공통 reset 관련 상태 =====
 st.session_state.setdefault("show_reset_confirm", False)
 st.session_state.setdefault("reset_input_value", "")
 
@@ -79,6 +90,7 @@ def load_config():
     except JSONDecodeError:
         return
 
+    # 텍스트 지침 기본 필드
     if isinstance(data.get("inst_role"), str):
         st.session_state.inst_role = data["inst_role"]
     elif isinstance(data.get("role_instruction"), str):
@@ -99,10 +111,19 @@ def load_config():
     if isinstance(hist, list):
         st.session_state.history = hist[-5:]
 
+    # 텍스트 지침 set
     if isinstance(data.get("instruction_sets"), list):
         st.session_state.instruction_sets = data["instruction_sets"]
     if "active_instruction_set_id" in data:
         st.session_state.active_instruction_set_id = data["active_instruction_set_id"]
+
+    # 공통 이미지 지침 set
+    if isinstance(data.get("image_instruction_sets"), list):
+        st.session_state.image_instruction_sets = data["image_instruction_sets"]
+    if "active_image_instruction_set_id" in data:
+        st.session_state.active_image_instruction_set_id = data["active_image_instruction_set_id"]
+    if isinstance(data.get("common_image_instruction"), str):
+        st.session_state.common_image_instruction = data["common_image_instruction"]
 
 
 def save_config():
@@ -117,6 +138,9 @@ def save_config():
         "history": st.session_state.history[-5:],
         "instruction_sets": st.session_state.get("instruction_sets", []),
         "active_instruction_set_id": st.session_state.get("active_instruction_set_id"),
+        "image_instruction_sets": st.session_state.get("image_instruction_sets", []),
+        "active_image_instruction_set_id": st.session_state.get("active_image_instruction_set_id"),
+        "common_image_instruction": st.session_state.get("common_image_instruction", ""),
     }
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -144,6 +168,13 @@ def reset_config():
         "edit_instruction_set_id",
         "instset_toolbar_run_id",
         "instset_delete_mode",
+        "image_instruction_sets",
+        "active_image_instruction_set_id",
+        "show_image_instruction_set_editor",
+        "edit_image_instruction_set_id",
+        "image_instset_toolbar_run_id",
+        "image_instset_delete_mode",
+        "common_image_instruction",
         "show_reset_confirm",
         "reset_input_value",
     ]:
@@ -168,6 +199,12 @@ def apply_instruction_set(set_obj: dict):
     ]:
         if key in set_obj:
             setattr(st.session_state, key, set_obj.get(key, ""))
+    save_config()
+
+
+def apply_image_instruction_set(set_obj: dict):
+    # 공통 이미지 지침 내용만 반영
+    st.session_state.common_image_instruction = set_obj.get("content", "")
     save_config()
 
 
@@ -204,6 +241,16 @@ def ensure_active_set_applied():
                 setattr(st.session_state, key, active_set.get(key, ""))
 
 
+def ensure_active_image_set_applied():
+    sets = st.session_state.get("image_instruction_sets", [])
+    active_id = st.session_state.get("active_image_instruction_set_id")
+    if not sets or not active_id:
+        return
+    active_set = next((s for s in sets if s.get("id") == active_id), None)
+    if active_set:
+        st.session_state.common_image_instruction = active_set.get("content", "")
+
+
 def run_generation():
     topic = st.session_state.current_input.strip()
     if not topic:
@@ -224,6 +271,8 @@ def run_generation():
         st.session_state.inst_forbidden,
         st.session_state.inst_format,
         st.session_state.inst_user_intent,
+        # 필요하다면 나중에 공통 이미지 지침도 system에 포함 가능:
+        # st.session_state.common_image_instruction,
     ]
     system_text = "\n\n".join(
         part.strip() for part in system_parts if isinstance(part, str) and part.strip()
@@ -264,10 +313,12 @@ def build_instruction_preview(source: dict) -> str:
     return "\n\n".join(parts)
 
 
+# ===== 최초 config 로드 =====
 if "config_loaded" not in st.session_state:
     load_config()
     st.session_state.config_loaded = True
 
+# 텍스트 지침 set 기본값
 if not st.session_state.instruction_sets:
     default_set = {
         "id": "default",
@@ -286,6 +337,20 @@ if not st.session_state.instruction_sets:
 else:
     ensure_active_set_applied()
 
+# 이미지 지침 set 기본값
+if not st.session_state.image_instruction_sets:
+    img_default_set = {
+        "id": "img_default",
+        "name": "기본 이미지 지침",
+        "content": st.session_state.common_image_instruction or "",
+    }
+    st.session_state.image_instruction_sets = [img_default_set]
+    st.session_state.active_image_instruction_set_id = "img_default"
+    save_config()
+else:
+    ensure_active_image_set_applied()
+
+# ===== 공통 스타일 =====
 st.markdown(
     """
     <style>
@@ -325,9 +390,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ================== 사이드바 ==================
 with st.sidebar:
     st.markdown("<div class='sidebar-top'>", unsafe_allow_html=True)
 
+    # ----- 텍스트 지침 set -----
     st.markdown("### 🎛 지침 set")
 
     inst_sets = st.session_state.instruction_sets
@@ -356,33 +423,30 @@ with st.sidebar:
             apply_instruction_set(selected_set)
             st.rerun()
 
-    # ==== 도구 라디오 버튼: -, +, 편집, del ====
+    # 텍스트 지침 set 도구
     toolbar_key = f"instset_toolbar_{st.session_state['instset_toolbar_run_id']}"
     action = st.radio(
         "",
-        ["-", "add", "edit", "del"],
+        ["-", "추가", "편집", "삭제"],
         key=toolbar_key,
         horizontal=True,
         label_visibility="collapsed",
     )
 
-    if action == "add":
+    if action == "추가":
         st.session_state.show_instruction_set_editor = True
         st.session_state.edit_instruction_set_id = None
         st.session_state.instset_toolbar_run_id += 1
         st.rerun()
-    elif action == "edit":
+    elif action == "편집":
         st.session_state.show_instruction_set_editor = True
         st.session_state.edit_instruction_set_id = st.session_state.active_instruction_set_id
         st.session_state.instset_toolbar_run_id += 1
         st.rerun()
-    elif action == "del":
+    elif action == "삭제":
         st.session_state.instset_delete_mode = True
         st.session_state.instset_toolbar_run_id += 1
         st.rerun()
-
-    # 도구 아래 구분선
-    st.markdown("---")
 
     if st.session_state.instset_delete_mode:
         sets = st.session_state.instruction_sets
@@ -422,6 +486,7 @@ with st.sidebar:
 
     st.markdown("### 📘 지침")
 
+    # ----- 텍스트 지침 설명 & 편집 -----
     with st.expander("1. 역할 지침 (Role Instructions)", expanded=False):
         st.caption("ChatGPT가 어떤 캐릭터 / 전문가 / 화자인지 정의합니다.")
         st.markdown(
@@ -554,8 +619,100 @@ with st.sidebar:
                 sync_active_set_field("inst_user_intent", st.session_state.inst_user_intent)
             st.success("사용자 요청 반영 지침이 저장되었습니다.")
 
+    # ======== 📘 지침 과 ⚙️ 설정 사이: 공통 이미지 지침 set ========
+    st.markdown("### 🖼 공통 이미지 지침 set")
+
+    img_sets = st.session_state.image_instruction_sets
+    active_img_id = st.session_state.active_image_instruction_set_id
+
+    if img_sets:
+        img_names = [s.get("name", f"이미지 셋 {i+1}") for i, s in enumerate(img_sets)]
+
+        active_img_index = 0
+        for i, s in enumerate(img_sets):
+            if s.get("id") == active_img_id:
+                active_img_index = i
+                break
+
+        selected_img_index = st.radio(
+            "공통 이미지 지침 set 선택",
+            options=list(range(len(img_sets))),
+            format_func=lambda i: img_names[i],
+            index=active_img_index,
+            label_visibility="collapsed",
+            key="image_instset_selector",
+        )
+
+        selected_img_set = img_sets[selected_img_index]
+        if selected_img_set.get("id") != active_img_id:
+            st.session_state.active_image_instruction_set_id = selected_img_set.get("id")
+            apply_image_instruction_set(selected_img_set)
+            st.rerun()
+
+    img_toolbar_key = f"image_instset_toolbar_{st.session_state['image_instset_toolbar_run_id']}"
+    img_action = st.radio(
+        "",
+        ["-", "추가", "편집", "삭제"],
+        key=img_toolbar_key,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    if img_action == "추가":
+        st.session_state.show_image_instruction_set_editor = True
+        st.session_state.edit_image_instruction_set_id = None
+        st.session_state.image_instset_toolbar_run_id += 1
+        st.rerun()
+    elif img_action == "편집":
+        st.session_state.show_image_instruction_set_editor = True
+        st.session_state.edit_image_instruction_set_id = st.session_state.active_image_instruction_set_id
+        st.session_state.image_instset_toolbar_run_id += 1
+        st.rerun()
+    elif img_action == "삭제":
+        st.session_state.image_instset_delete_mode = True
+        st.session_state.image_instset_toolbar_run_id += 1
+        st.rerun()
+
+    if st.session_state.image_instset_delete_mode:
+        sets = st.session_state.image_instruction_sets
+        if not sets:
+            st.info("삭제할 공통 이미지 지침 set이 없습니다.")
+        else:
+            names = [s.get("name", f"이미지 셋 {i+1}") for i, s in enumerate(sets)]
+            del_index = st.selectbox(
+                "삭제할 공통 이미지 지침 set 선택",
+                options=list(range(len(sets))),
+                format_func=lambda i: names[i],
+                label_visibility="collapsed",
+                key="delete_image_instruction_set_select",
+            )
+            col_img_del1, col_img_del2 = st.columns(2)
+            with col_img_del1:
+                if st.button("선택한 이미지 지침 set 삭제", use_container_width=True):
+                    delete_id = sets[del_index].get("id")
+                    st.session_state.image_instruction_sets = [
+                        s for s in sets if s.get("id") != delete_id
+                    ]
+                    if delete_id == st.session_state.active_image_instruction_set_id:
+                        if st.session_state.image_instruction_sets:
+                            st.session_state.active_image_instruction_set_id = (
+                                st.session_state.image_instruction_sets[0].get("id")
+                            )
+                            ensure_active_image_set_applied()
+                        else:
+                            st.session_state.active_image_instruction_set_id = None
+                            st.session_state.common_image_instruction = ""
+                    save_config()
+                    st.session_state.image_instset_delete_mode = False
+                    st.rerun()
+            with col_img_del2:
+                if st.button("취소", use_container_width=True):
+                    st.session_state.image_instset_delete_mode = False
+                    st.rerun()
+
     st.markdown("</div><div class='sidebar-bottom'>", unsafe_allow_html=True)
 
+    # ----- 설정 블록 -----
     st.markdown("### ⚙️ 설정")
 
     with st.expander("GPT 모델 선택", expanded=False):
@@ -611,6 +768,9 @@ with st.sidebar:
             "history": st.session_state.history[-5:],
             "instruction_sets": st.session_state.get("instruction_sets", []),
             "active_instruction_set_id": st.session_state.get("active_instruction_set_id"),
+            "image_instruction_sets": st.session_state.get("image_instruction_sets", []),
+            "active_image_instruction_set_id": st.session_state.get("active_image_instruction_set_id"),
+            "common_image_instruction": st.session_state.get("common_image_instruction", ""),
         }
         export_json_str = json.dumps(export_data, ensure_ascii=False, indent=2)
         st.download_button(
@@ -641,7 +801,9 @@ with st.sidebar:
                     del st.session_state["config_loaded"]
                 load_config()
                 ensure_active_set_applied()
+                ensure_active_image_set_applied()
 
+                # 텍스트 지침 set이 비어 있으면 기본 생성
                 if not st.session_state.instruction_sets:
                     default_set = {
                         "id": "default",
@@ -656,13 +818,24 @@ with st.sidebar:
                     }
                     st.session_state.instruction_sets = [default_set]
                     st.session_state.active_instruction_set_id = "default"
-                    save_config()
 
+                # 이미지 지침 set이 비어 있으면 기본 생성
+                if not st.session_state.image_instruction_sets:
+                    img_default_set = {
+                        "id": "img_default",
+                        "name": "기본 이미지 지침",
+                        "content": st.session_state.common_image_instruction or "",
+                    }
+                    st.session_state.image_instruction_sets = [img_default_set]
+                    st.session_state.active_image_instruction_set_id = "img_default"
+
+                save_config()
                 st.success("✅ config.json이 성공적으로 불러와졌습니다. 설정이 적용됩니다.")
                 st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+# ================== 메인 영역 ==================
 inst_sets_main = st.session_state.instruction_sets
 active_id_main = st.session_state.active_instruction_set_id
 active_set_main = None
@@ -696,6 +869,8 @@ st.markdown(
     f"<h3 style='text-align:center; margin:0.5rem 0 1.5rem 0;'>{active_name_main}</h3>",
     unsafe_allow_html=True,
 )
+
+# ----- 텍스트 지침 set 편집 폼 -----
 if st.session_state.get("show_instruction_set_editor", False):
     edit_id = st.session_state.get("edit_instruction_set_id")
     edit_mode = bool(edit_id)
@@ -794,6 +969,86 @@ if st.session_state.get("show_instruction_set_editor", False):
                 st.success("✅ 지침 set이 저장되었습니다.")
                 st.rerun()
 
+# ----- 공통 이미지 지침 set 편집 폼 (단일 texteditor) -----
+if st.session_state.get("show_image_instruction_set_editor", False):
+    edit_id = st.session_state.get("edit_image_instruction_set_id")
+    edit_mode = bool(edit_id)
+
+    target_set = None
+    if edit_mode:
+        for s in st.session_state.image_instruction_sets:
+            if s.get("id") == edit_id:
+                target_set = s
+                break
+
+    if edit_mode and target_set:
+        title_text = "✏️ 공통 이미지 지침 set 편집"
+        default_name = target_set.get("name", "")
+        content_default = target_set.get("content", "")
+    else:
+        title_text = "✨ 새 공통 이미지 지침 set 추가"
+        default_name = ""
+        content_default = st.session_state.common_image_instruction or ""
+
+    st.markdown(f"## {title_text}")
+
+    with st.form("image_instruction_set_editor_form"):
+        set_name = st.text_input(
+            "공통 이미지 지침 set 이름",
+            value=default_name,
+            placeholder="예: 다큐 기본 이미지 스타일 / 감성 쇼츠 스타일 등",
+        )
+
+        content_txt = st.text_area(
+            "공통 이미지 지침 내용",
+            content_default,
+            height=200,
+            help="예: 카메라 구도, 조명 스타일, 색감, 해상도, 렌즈, 화풍 등 통합 프롬프트",
+        )
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            submit_label = "💾 수정 내용 저장" if edit_mode else "💾 공통 이미지 지침 set 저장"
+            submitted = st.form_submit_button(submit_label)
+        with col_b:
+            cancel = st.form_submit_button("취소")
+
+        if cancel:
+            st.session_state.show_image_instruction_set_editor = False
+            st.session_state.edit_image_instruction_set_id = None
+            st.rerun()
+
+        if submitted:
+            if not set_name.strip():
+                st.error("공통 이미지 지침 set 이름을 입력해주세요.")
+            else:
+                if edit_mode and target_set:
+                    target_set["name"] = set_name.strip()
+                    target_set["content"] = content_txt.strip()
+                    for i, s in enumerate(st.session_state.image_instruction_sets):
+                        if s.get("id") == edit_id:
+                            st.session_state.image_instruction_sets[i] = target_set
+                            break
+                    st.session_state.active_image_instruction_set_id = edit_id
+                else:
+                    new_id = str(uuid4())
+                    new_set = {
+                        "id": new_id,
+                        "name": set_name.strip(),
+                        "content": content_txt.strip(),
+                    }
+                    st.session_state.image_instruction_sets.append(new_set)
+                    st.session_state.active_image_instruction_set_id = new_id
+
+                st.session_state.common_image_instruction = content_txt.strip()
+                ensure_active_image_set_applied()
+                st.session_state.show_image_instruction_set_editor = False
+                st.session_state.edit_image_instruction_set_id = None
+                save_config()
+                st.success("✅ 공통 이미지 지침 set이 저장되었습니다.")
+                st.rerun()
+
+# ----- 최근 입력 -----
 if st.session_state.history:
     items = st.session_state.history[-5:]
     html_items = ""
