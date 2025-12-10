@@ -483,7 +483,7 @@ with st.sidebar:
                 if st.button("취소", use_container_width=True):
                     st.session_state.instset_delete_mode = False
                     st.rerun()
-
+    st.markdown("---")
     st.markdown("### 📘 지침")
 
     # ----- 텍스트 지침 설명 & 편집 -----
@@ -618,7 +618,7 @@ with st.sidebar:
                 st.session_state.inst_user_intent = inst_user_intent_edit.strip()
                 sync_active_set_field("inst_user_intent", st.session_state.inst_user_intent)
             st.success("사용자 요청 반영 지침이 저장되었습니다.")
-
+    st.markdown("---")
     # ======== 📘 지침 과 ⚙️ 설정 사이: 공통 이미지 지침 set ========
     st.markdown("### 🖼 공통 이미지 지침 set")
 
@@ -711,7 +711,7 @@ with st.sidebar:
                     st.rerun()
 
     st.markdown("</div><div class='sidebar-bottom'>", unsafe_allow_html=True)
-
+    st.markdown("---")
     # ----- 설정 블록 -----
     st.markdown("### ⚙️ 설정")
 
