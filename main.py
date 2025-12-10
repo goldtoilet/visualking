@@ -7,8 +7,6 @@ from uuid import uuid4
 
 st.set_page_config(page_title="시각화 마스터", page_icon="📝", layout="centered")
 
-LOGIN_ID_ENV = os.getenv("LOGIN_ID")
-LOGIN_PW_ENV = os.getenv("LOGIN_PW")
 api_key = os.getenv("GPT_API_KEY")
 client = OpenAI(api_key=api_key)
 
@@ -27,128 +25,7 @@ st.markdown(
 )
 
 # --------- 기본 세션값 ---------
-st.session_state.setdefault("logged_in", False)
 st.session_state.setdefault("history", [])
-st.session_state.setdefault("login_id", LOGIN_ID_ENV or "")
-st.session_state.setdefault("login_pw", LOGIN_PW_ENV or "")
-st.session_state.setdefault("remember_login", False)
-
-# ===== 기본 지침 값 세팅 =====
-st.session_state.setdefault(
-    "inst_role",
-    """너의 역할은 **한국어 대본을 이미지 시각화용 영어 프롬프트로 변환하는 전문 변환기(visualization prompt generator)**다.
-항상 원문 의미를 정확히 해석하고, 의미 범위를 벗어나지 않는 사실적·현실적 묘사만 허용한다.
-출력은 “스크립트-투-이미지” 목적에 최적화된 형태로 구성한다."""
-)
-
-st.session_state.setdefault(
-    "inst_tone",
-    """[2. 톤·스타일 지침 (Tone & Style Instructions)]
-
-전체적인 어조는 명확·중립·사실적이다.
-
-묘사는 감정·장면·구도 등을 구체적으로 표현하되, 과도한 창작이나 판타지는 금지한다.
-
-시각 묘사는 장르적 성격(다큐 / 시네마틱 / 애니메이션 / 전기 등)에 일관되도록 유지한다.
-
-[2-A. 스타일 래퍼 지침 (Style Wrapper Rules)]
-
-아래 규칙은 이미지 프롬프트 앞에 항상 붙는 공통 스타일 문장에 관한 규칙이다.
-
-- 대본 분석을 기반으로 단일 장르를 선택한다. (예: documentary, cinematic, animation 등)
-- 선택된 장르에 맞춰 스타일 래퍼 1문장만 선언한다.
-- 생성되는 모든 영어 이미지 프롬프트 문장의 가장 앞에 이 스타일 래퍼 문장을 완전히 동일하게 반복한다.
-- 단 하나의 단어·쉼표도 변형·삭제 금지, 누락 금지."""
-)
-
-# 공통 스타일 래퍼(실제 한 문장)
-st.session_state.setdefault(
-    "inst_style_wrapper",
-    "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, neutral color grading, close-up or wide shot, cinematic realism, subtle noise/grain added."
-)
-
-st.session_state.setdefault(
-    "inst_structure",
-    """[3. 구성 지침 (Structure / Flow)]
-
-스크립트-투-이미지 변환 출력은 다음 순서를 반드시 따른다:
-
-1) 제목
-   - 항상 이 텍스트로 시작한다:
-     ⚡ 스크립트-투-이미지 시각화 프롬프트
-
-2) 대본 분석 요약 (2~4문장)
-   - 주제 · 톤 · 정서 · 장르적 특성 포함
-   - 이를 기반으로 최종 장르 선택
-
-3) 스타일 래퍼 선언
-   - 선택된 장르에 맞춘 1문장을 ‘스타일 래퍼:’ 아래 제시
-
-4) 문장별 변환
-   - 원문 대본을 자연스러운 의미 단위로 나누고
-   - 각 문장은 반드시 2줄 구조로 출력:
-     [한국어 원문]
-     [영어 이미지 프롬프트]"""
-)
-
-st.session_state.setdefault(
-    "inst_depth",
-    """[4. 정보 밀도·연구 깊이 지침 (Depth Rules)]
-
-- 원문 의미를 벗어나지 않는 범위 내에서 최대한 구체적이고 사실적인 시각 요소를 추가한다.
-- 묘사는 장면·환경·빛·감정·구도·움직임 등을 자연스러운 선에서 확장한다.
-- 실존 요소(장소, 시대적 분위기 등)는 왜곡 없이 표현한다.
-- 지나친 해석, 상상, 상징적 장면 창조는 금지한다."""
-)
-
-st.session_state.setdefault(
-    "inst_forbidden",
-    """[5. 금지 지침 (Forbidden Rules)]
-
-다음 사항은 절대 금지한다:
-
-- 스타일 래퍼 누락
-- 스타일 래퍼의 단어·구문 수정 또는 축약
-- 대본 분석 없이 바로 이미지 프롬프트 생성
-- 원문 의미 과장·왜곡
-- 판타지/허구적 창작, 초현실적 요소 추가
-- 실존 인물·단체의 왜곡
-- 문장 앞뒤 형식 변경
-- 문장의 두 줄 구조(한국어 → 영어 프롬프트) 무시
-- 출력 순서 임의 변경"""
-)
-
-st.session_state.setdefault(
-    "inst_format",
-    """[6. 출력 형식 지침 (Format Rules)]
-
-최종 출력 형식은 다음을 반드시 따른다:
-
-1) 제목
-   - ⚡ 스크립트-투-이미지 시각화 프롬프트
-
-2) 대본 분석 요약(2~4문장)
-
-3) 스타일 래퍼 선언부
-
-4) 문장별 변환
-   - 한국어 문장
-   - 공통 스타일 래퍼로 시작하는 영어 이미지 프롬프트
-     (두 줄 세트 반복)
-
-전체 출력은 깔끔하고 구분된 블록 형태로 유지해야 한다."""
-)
-
-st.session_state.setdefault(
-    "inst_user_intent",
-    """[7. 사용자 요청 반영 지침 (User Intent Adaptation)]
-
-- 사용자의 요청(장르 지정, 스타일 기조, 시각화 정도 등)을 항상 최우선으로 반영한다.
-- 사용자가 특정 스타일을 요구할 경우, 선택된 장르와 충돌하지 않는 선에서 조정한다.
-- 대본의 특성상 의미 단위가 길거나 짧아도, 자연스러운 문장 단위로 분리해 처리한다.
-- 변환 결과는 즉시 사용 가능한 이미지 생성용 프롬프트로 제공해야 한다."""
-)
-
 st.session_state.setdefault("current_input", "")
 st.session_state.setdefault("last_output", "")
 st.session_state.setdefault("model_choice", "gpt-4o-mini")
@@ -157,6 +34,48 @@ st.session_state.setdefault("model_choice", "gpt-4o-mini")
 st.session_state.setdefault("instruction_sets", [])
 st.session_state.setdefault("active_instruction_set_id", None)
 st.session_state.setdefault("show_add_instruction_set_editor", False)
+
+# ===== 기본 지침 값 세팅 (한 줄 간단 버전) =====
+st.session_state.setdefault(
+    "inst_role",
+    "너는 한국어 대본을 이미지 시각화용 영어 프롬프트로 변환해 주는 도우미야."
+)
+
+st.session_state.setdefault(
+    "inst_tone",
+    "전체 톤은 차분하고 사실적이며, 과장 없이 담백하게 묘사해줘."
+)
+
+st.session_state.setdefault(
+    "inst_structure",
+    "제목, 간단한 분석, 그리고 문장별로 [한국어 원문] / [영어 이미지 프롬프트] 순서로 정리해줘."
+)
+
+st.session_state.setdefault(
+    "inst_depth",
+    "원문 의미를 벗어나지 않는 범위에서 장면, 분위기, 구도를 조금 더 구체적으로 묘사해줘."
+)
+
+st.session_state.setdefault(
+    "inst_forbidden",
+    "원문 의미를 왜곡하거나 과도한 판타지·초현실적 요소를 추가하면 안 돼."
+)
+
+st.session_state.setdefault(
+    "inst_format",
+    "섹션별로 줄바꿈을 잘 넣어서 사람이 읽기 편한 블록 형식으로 출력해줘."
+)
+
+st.session_state.setdefault(
+    "inst_user_intent",
+    "사용자가 요청한 장르나 스타일이 있다면, 충돌되지 않는 선에서 최대한 반영해줘."
+)
+
+# 공통 스타일 래퍼(실제 한 문장, 간단 버전)
+st.session_state.setdefault(
+    "inst_style_wrapper",
+    "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, cinematic realism."
+)
 
 
 def load_config():
@@ -192,14 +111,6 @@ def load_config():
     if isinstance(hist, list):
         st.session_state.history = hist[-5:]
 
-    # 로그인 정보
-    if isinstance(data.get("login_id"), str):
-        st.session_state.login_id = data["login_id"]
-    if isinstance(data.get("login_pw"), str):
-        st.session_state.login_pw = data["login_pw"]
-    if "remember_login" in data:
-        st.session_state.remember_login = bool(data["remember_login"])
-
     # 지침 set 관련
     if isinstance(data.get("instruction_sets"), list):
         st.session_state.instruction_sets = data["instruction_sets"]
@@ -219,9 +130,6 @@ def save_config():
         "inst_user_intent": st.session_state.inst_user_intent,
         "inst_style_wrapper": st.session_state.inst_style_wrapper,
         "history": st.session_state.history[-5:],
-        "login_id": st.session_state.login_id,
-        "login_pw": st.session_state.login_pw,
-        "remember_login": st.session_state.remember_login,
         "instruction_sets": st.session_state.get("instruction_sets", []),
         "active_instruction_set_id": st.session_state.get("active_instruction_set_id"),
     }
@@ -244,9 +152,6 @@ def reset_config():
         "inst_user_intent",
         "inst_style_wrapper",
         "history",
-        "login_id",
-        "login_pw",
-        "remember_login",
         "current_input",
         "last_output",
         "model_choice",
@@ -257,7 +162,6 @@ def reset_config():
         if key in st.session_state:
             del st.session_state[key]
 
-    st.session_state["logged_in"] = False
     if "config_loaded" in st.session_state:
         del st.session_state["config_loaded"]
 
@@ -334,60 +238,6 @@ def ensure_active_set_applied():
                 setattr(st.session_state, key, active_set.get(key, ""))
 
 
-def login_screen():
-    st.markdown(
-        """
-        <style>
-        .block-container {
-            max-width: 420px;
-            padding-top: 4.5rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """<div style='text-align:center;'>
-        <div style='
-            width:100px; height:100px;
-            border-radius:50%;
-            background:#93c5fd;
-            display:flex; align-items:center; justify-content:center;
-            font-size:40px; margin:auto;
-            color:#111827; font-weight:bold;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
-        '>N</div>
-        <h1 style='margin-top:26px; margin-bottom:24px;'>시각화 마스터</h1>
-    </div>""",
-        unsafe_allow_html=True,
-    )
-
-    default_id = st.session_state.login_id if st.session_state.remember_login else ""
-    default_pw = st.session_state.login_pw if st.session_state.remember_login else ""
-
-    with st.form(key="login_form"):
-        user = st.text_input("아이디", placeholder="ID 입력", value=default_id)
-        pw = st.text_input("비밀번호", type="password", placeholder="비밀번호", value=default_pw)
-        remember = st.checkbox("로그인 정보 저장", value=st.session_state.remember_login)
-
-        submitted = st.form_submit_button("로그인")
-        if submitted:
-            valid_id = st.session_state.login_id or LOGIN_ID_ENV or ""
-            valid_pw = st.session_state.login_pw or LOGIN_PW_ENV or ""
-
-            if user == valid_id and pw == valid_pw:
-                st.session_state["logged_in"] = True
-                st.session_state["remember_login"] = remember
-                if remember:
-                    st.session_state.login_id = user
-                    st.session_state.login_pw = pw
-                save_config()
-                st.rerun()
-            else:
-                st.error("❌ 아이디 또는 비밀번호가 틀렸습니다.")
-
-
 # --------- config 최초 로드 ---------
 if "config_loaded" not in st.session_state:
     load_config()
@@ -412,10 +262,6 @@ if not st.session_state.instruction_sets:
     save_config()
 else:
     ensure_active_set_applied()
-
-if not st.session_state["logged_in"]:
-    login_screen()
-    st.stop()
 
 # 메인 영역 폭 넓게 조정 + 인풋 스타일
 st.markdown(
@@ -482,7 +328,7 @@ def run_generation():
     )
 
     user_text = (
-        "위 1~7 지침을 모두 엄격하게 따르면서, 아래 한국어 대본을 "
+        "위 지침을 모두 따르면서, 아래 한국어 대본을 "
         "스크립트-투-이미지 시각화용 출력 형식으로 변환해줘.\n\n"
         "대본:\n"
         f"{topic}"
@@ -546,7 +392,7 @@ with st.sidebar:
         inst_role_edit = st.text_area(
             "역할 지침",
             st.session_state.inst_role,
-            height=160,
+            height=80,
             key="inst_role_edit",
         )
         if st.button("역할 지침 저장", key="save_role"):
@@ -561,18 +407,17 @@ with st.sidebar:
         inst_tone_edit = st.text_area(
             "톤 & 스타일 지침",
             st.session_state.inst_tone,
-            height=220,
+            height=100,
             key="inst_tone_edit",
         )
 
         inst_style_wrapper_edit = st.text_area(
             "공통 스타일 래퍼 (영어 한 문장)",
             st.session_state.inst_style_wrapper,
-            height=80,
+            height=60,
             key="inst_style_wrapper_edit",
             placeholder=(
-                "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, "
-                "neutral color grading, close-up or wide shot, cinematic realism, subtle noise/grain added."
+                "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, cinematic realism."
             ),
         )
 
@@ -591,7 +436,7 @@ with st.sidebar:
         inst_structure_edit = st.text_area(
             "콘텐츠 구성 지침",
             st.session_state.inst_structure,
-            height=200,
+            height=100,
             key="inst_structure_edit",
         )
         if st.button("콘텐츠 구성 지침 저장", key="save_structure"):
@@ -605,7 +450,7 @@ with st.sidebar:
         inst_depth_edit = st.text_area(
             "정보 밀도 & 조사 심도 지침",
             st.session_state.inst_depth,
-            height=200,
+            height=100,
             key="inst_depth_edit",
         )
         if st.button("정보 밀도 지침 저장", key="save_depth"):
@@ -619,7 +464,7 @@ with st.sidebar:
         inst_forbidden_edit = st.text_area(
             "금지 지침",
             st.session_state.inst_forbidden,
-            height=220,
+            height=100,
             key="inst_forbidden_edit",
         )
         if st.button("금지 지침 저장", key="save_forbidden"):
@@ -633,7 +478,7 @@ with st.sidebar:
         inst_format_edit = st.text_area(
             "출력 형식 지침",
             st.session_state.inst_format,
-            height=220,
+            height=100,
             key="inst_format_edit",
         )
         if st.button("출력 형식 지침 저장", key="save_format"):
@@ -647,7 +492,7 @@ with st.sidebar:
         inst_user_intent_edit = st.text_area(
             "사용자 요청 반영 지침",
             st.session_state.inst_user_intent,
-            height=200,
+            height=100,
             key="inst_user_intent_edit",
         )
         if st.button("사용자 요청 지침 저장", key="save_user_intent"):
@@ -672,37 +517,9 @@ with st.sidebar:
         )
         st.session_state.model_choice = model
 
-    with st.expander("👤 계정 관리", expanded=False):
-        st.caption("비밀번호 변경 및 로그아웃")
-
-        with st.form("change_password_form"):
-            current_pw = st.text_input("현재 비밀번호", type="password")
-            new_pw = st.text_input("새 비밀번호", type="password")
-            new_pw2 = st.text_input("새 비밀번호 확인", type="password")
-            pw_submitted = st.form_submit_button("비밀번호 변경")
-
-            if pw_submitted:
-                valid_pw = st.session_state.login_pw or LOGIN_PW_ENV or ""
-                if current_pw != valid_pw:
-                    st.error("현재 비밀번호가 올바르지 않습니다.")
-                elif not new_pw:
-                    st.error("새 비밀번호를 입력하세요.")
-                elif new_pw != new_pw2:
-                    st.error("새 비밀번호와 확인이 일치하지 않습니다.")
-                else:
-                    st.session_state.login_pw = new_pw
-                    save_config()
-                    st.success("비밀번호가 변경되었습니다.")
-
-        if st.button("🚪 로그아웃", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.current_input = ""
-            st.session_state.last_output = ""
-            st.rerun()
-
     # config 초기화
     with st.expander("🧹 설정 초기화 (config.json)", expanded=False):
-        st.caption("모든 지침, 최근 입력, 로그인 정보, config.json 파일을 초기화합니다. 되돌릴 수 없습니다.")
+        st.caption("모든 지침, 최근 입력, config.json 파일을 초기화합니다. 되돌릴 수 없습니다.")
         if st.button("config.json 초기화", use_container_width=True):
             reset_config()
 
@@ -720,9 +537,6 @@ with st.sidebar:
             "inst_user_intent": st.session_state.inst_user_intent,
             "inst_style_wrapper": st.session_state.inst_style_wrapper,
             "history": st.session_state.history[-5:],
-            "login_id": st.session_state.login_id,
-            "login_pw": st.session_state.login_pw,
-            "remember_login": st.session_state.remember_login,
             "instruction_sets": st.session_state.get("instruction_sets", []),
             "active_instruction_set_id": st.session_state.get("active_instruction_set_id"),
         }
@@ -824,8 +638,7 @@ if st.session_state.get("show_add_instruction_set_editor", False):
             "",
             height=60,
             placeholder=(
-                "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, "
-                "neutral color grading, close-up or wide shot, cinematic realism, subtle noise/grain added."
+                "Shot on high-resolution digital cinema camera, 16:9 aspect ratio, cinematic realism."
             ),
         )
         struct_txt = st.text_area("3. 콘텐츠 구성 지침", "", height=80)
@@ -871,23 +684,6 @@ if st.session_state.get("show_add_instruction_set_editor", False):
                 save_config()
                 st.success("✅ 새 지침 set이 저장되었습니다.")
                 st.rerun()
-
-# -------- div1: 상단 로고 + 타이틀 --------
-st.markdown(
-    """<div style='text-align:center;'>
-    <div style='
-        width:100px; height:100px;
-        border-radius:50%;
-        background:#93c5fd;
-        display:flex; align-items:center; justify-content:center;
-        font-size:40px; margin:auto;
-        color:#111827; font-weight:bold;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.08);
-    '>N</div>
-    <h1 style='margin-top:26px; margin-bottom:6px;'>시각화 마스터</h1>
-</div>""",
-    unsafe_allow_html=True,
-)
 
 # -------- div2: 최근 입력 --------
 if st.session_state.history:
