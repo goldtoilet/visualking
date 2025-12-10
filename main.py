@@ -688,7 +688,7 @@ if active_set_main is None:
 
 st.markdown(
     "<h2 style='margin-bottom:0.15rem; text-align:right; "
-    "color:#374151; font-size:22px;'>scriptking</h2>",
+    "color:#374151; font-size:22px;'>visualking</h2>",
     unsafe_allow_html=True,
 )
 st.markdown("---")
