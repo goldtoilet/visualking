@@ -1092,7 +1092,7 @@ pad_left, center_col, pad_right = st.columns([1, 7, 1])
 with center_col:
     st.markdown(
         "<div style='color:#4b5563; font-size:1.0rem; font-weight:500; "
-        "margin-bottom:12px; text-align:center;'>대본을 시각화 해 드립니다.</div>",
+        "margin-bottom:12px; text-align:center;'>대본을 시각화 해 드립니다.대본을 넣어주세요.</div>",
         unsafe_allow_html=True,
     )
 
