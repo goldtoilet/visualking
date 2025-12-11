@@ -1114,7 +1114,8 @@ with center_col:
         unsafe_allow_html=True,
     )
 
-    st.session_state.current_input = st.text_area(
+    # 위젯이 session_state["current_input"]를 자동으로 관리하게 둡니다.
+    _ = st.text_area(
         label="주제 입력",
         key="current_input",
         placeholder="여기에 대본을 붙여넣고, 아래 지침수행 버튼을 눌러주세요.",
@@ -1122,9 +1123,10 @@ with center_col:
         label_visibility="collapsed",
     )
 
-    # (요청) 엔터 대신 버튼으로 실행
     if st.button("지침 수행", use_container_width=True):
+        # run_generation() 안에서 st.session_state.current_input 을 그대로 사용
         run_generation()
+
 
 st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
 
